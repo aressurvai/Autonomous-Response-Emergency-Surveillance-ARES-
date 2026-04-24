@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A.R.E.S — Autonomous Response & Emergency Surveillance</title>
+  <link rel="stylesheet" href="src/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <!-- LOGIN SCREEN -->
+  <div id="login-screen" class="screen active">
+    <div class="login-bg">
+      <div class="scan-line"></div>
+      <div class="grid-overlay"></div>
+    </div>
+    <div class="login-container">
+      <div class="login-logo">
+        <div class="logo-hex">
+          <svg viewBox="0 0 100 100" width="80" height="80">
+            <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5" fill="none" stroke="#00ff9d" stroke-width="2"/>
+            <polygon points="50,15 85,32.5 85,67.5 50,85 15,67.5 15,32.5" fill="none" stroke="#00ff9d" stroke-width="1" opacity="0.4"/>
+            <text x="50" y="58" text-anchor="middle" fill="#00ff9d" font-family="Orbitron" font-size="22" font-weight="900">A</text>
+          </svg>
+        </div>
+        <h1 class="logo-title">A.R.E.S</h1>
+        <p class="logo-sub">Autonomous Response & Emergency Surveillance</p>
+      </div>
+      <div class="login-form">
+        <div class="form-group">
+          <label>OPERATOR ID</label>
+          <input type="text" id="username" placeholder="Enter operator ID" value="admin"/>
+        </div>
+        <div class="form-group">
+          <label>ACCESS CODE</label>
+          <input type="password" id="password" placeholder="Enter access code" value="ares2024"/>
+        </div>
+        <div id="login-error" class="login-error"></div>
+        <button class="btn-primary" onclick="handleLogin()">
+          <span>INITIALIZE SYSTEM</span>
+          <div class="btn-glow"></div>
+        </button>
+        <p class="login-hint">Default: admin / ares2024</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="main-app" class="screen">
+    <!-- Titlebar -->
+    <div class="titlebar">
+      <div class="titlebar-left">
+        <div class="titlebar-logo">▲ A.R.E.S</div>
+        <div class="titlebar-status">
+          <span class="status-dot" id="api-status-dot"></span>
+          <span id="api-status-text">Connecting...</span>
+        </div>
+      </div>
+      <div class="titlebar-drag"></div>
+      <div class="titlebar-controls">
+        <button onclick="minimizeWindow()">─</button>
+        <button onclick="maximizeWindow()">□</button>
+        <button onclick="closeWindow()" class="close-btn">✕</button>
+        <button onclick="showQR()" style="
+  background:transparent; border:1px solid #00ff9d; color:#00ff9d;
+  padding:4px 14px; cursor:pointer; font-family:'Share Tech Mono',monospace;
+  font-size:10px; letter-spacing:1px; border-radius:2px; margin-right:8px;
+  -webkit-app-region: no-drag;">
+  MOBILE QR
+</button>
+      </div>
+    </div>
+
+    <div class="app-layout">
+      <!-- Sidebar -->
+      <nav class="sidebar">
+        <div class="sidebar-user">
+          <div class="user-avatar">OP</div>
+          <div class="user-info">
+            <div class="user-name" id="sidebar-username">ADMIN</div>
+            <div class="user-role">System Operator</div>
+          </div>
+        </div>
+        <div class="nav-section-label">MONITORING</div>
+        <button class="nav-item active" onclick="navigate('dashboard')" data-page="dashboard">
+          <span class="nav-icon">◉</span> Dashboard
+        </button>
+        <button class="nav-item" onclick="navigate('alerts')" data-page="alerts">
+          <span class="nav-icon">⚠</span> Alerts
+          <span class="nav-badge" id="alerts-badge">0</span>
+        </button>
+        <div class="nav-section-label">FEDERATED LEARNING</div>
+        <button class="nav-item" onclick="navigate('fl-training')" data-page="fl-training">
+          <span class="nav-icon">◈</span> FL Training
+        </button>
+        <button class="nav-item" onclick="navigate('stackelberg')" data-page="stackelberg">
+          <span class="nav-icon">◆</span> Stackelberg
+        </button>
+        <button class="nav-item" onclick="navigate('manager')" data-page="manager">
+          <span class="nav-icon">⬡</span> Client/Server
+        </button>
+        <div class="nav-section-label">OPERATIONS</div>
+        <button class="nav-item" onclick="navigate('upload')" data-page="upload">
+          <span class="nav-icon">↑</span> Upload Footage
+        </button>
+        <div class="sidebar-bottom">
+          <button class="nav-item logout-btn" onclick="handleLogout()">
+            <span class="nav-icon">⏻</span> Logout
+          </button>
+        </div>
+      </nav>
+
+      <!-- Main Content -->
+      <main class="main-content">
+
+        <!-- DASHBOARD PAGE -->
+        <div id="page-dashboard" class="page active">
+          <div class="page-header">
+            <div>
+              <h2 class="page-title">Live Surveillance</h2>
+              <p class="page-sub">Real-time monitoring active</p>
+            </div>
+            <div class="header-stats">
+              <div class="stat-chip">
+                <span class="stat-label">THREATS</span>
+                <span class="stat-val danger" id="threat-count">0</span>
+              </div>
+              <div class="stat-chip">
+                <span class="stat-label">NODES</span>
+                <span class="stat-val success">3</span>
+              </div>
+              <div class="stat-chip">
+                <span class="stat-label">ACCURACY</span>
+                <span class="stat-val" id="dashboard-accuracy">--</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Alert Banner -->
+          <div id="alert-banner" class="alert-banner hidden">
+            <div class="alert-pulse"></div>
+            <div class="alert-content">
+              <span class="alert-icon">⚠</span>
+              <div>
+                <div class="alert-title">ACTIVE ALERT DETECTED</div>
+                <div class="alert-desc" id="alert-banner-text">--</div>
+              </div>
+            </div>
+            <button class="alert-dismiss" onclick="dismissAlert()">DISMISS</button>
+          </div>
+
+          <!-- Camera Grid -->
+          <div class="camera-grid">
+            <div class="camera-card" id="cam-0">
+              <div class="cam-header">
+                <span class="cam-id">NODE 01</span>
+                <span class="cam-status active">● ACTIVE</span>
+              </div>
+              <div class="cam-feed">
+                <div class="cam-placeholder">
+                  <div class="cam-icon">📷</div>
+                  <div class="cam-label">Client 1 Feed</div>
+                  <div class="cam-sub">Upload footage to activate</div>
+                </div>
+                <video id="video-0" class="cam-video hidden" controls></video>
+              </div>
+              <div class="cam-footer">
+                <span class="cam-location">Camera Node 1</span>
+                <span class="cam-detections" id="cam-0-detections">0 detections</span>
+              </div>
+            </div>
+            <div class="camera-card" id="cam-1">
+              <div class="cam-header">
+                <span class="cam-id">NODE 02</span>
+                <span class="cam-status active">● ACTIVE</span>
+              </div>
+              <div class="cam-feed">
+                <div class="cam-placeholder">
+                  <div class="cam-icon">📷</div>
+                  <div class="cam-label">Client 2 Feed</div>
+                  <div class="cam-sub">Upload footage to activate</div>
+                </div>
+                <video id="video-1" class="cam-video hidden" controls></video>
+              </div>
+              <div class="cam-footer">
+                <span class="cam-location">Camera Node 2</span>
+                <span class="cam-detections" id="cam-1-detections">0 detections</span>
+              </div>
+            </div>
+            <div class="camera-card" id="cam-2">
+              <div class="cam-header">
+                <span class="cam-id">NODE 03</span>
+                <span class="cam-status active">● ACTIVE</span>
+              </div>
+              <div class="cam-feed">
+                <div class="cam-placeholder">
+                  <div class="cam-icon">📷</div>
+                  <div class="cam-label">Client 3 Feed</div>
+                  <div class="cam-sub">Upload footage to activate</div>
+                </div>
+                <video id="video-2" class="cam-video hidden" controls></video>
+              </div>
+              <div class="cam-footer">
+                <span class="cam-location">Camera Node 3</span>
+                <span class="cam-detections" id="cam-2-detections">0 detections</span>
+              </div>
+            </div>
+            <div class="camera-card">
+              <div class="cam-header">
+                <span class="cam-id">SYSTEM</span>
+                <span class="cam-status">● MONITOR</span>
+              </div>
+              <div class="cam-feed system-feed">
+                <div class="system-stats">
+                  <div class="sys-row">
+                    <span>FL Status</span>
+                    <span class="sys-val" id="fl-status-dash">Standby</span>
+                  </div>
+                  <div class="sys-row">
+                    <span>Global Model</span>
+                    <span class="sys-val success">global_model.pt</span>
+                  </div>
+                  <div class="sys-row">
+                    <span>Last Accuracy</span>
+                    <span class="sys-val" id="sys-accuracy">--</span>
+                  </div>
+                  <div class="sys-row">
+                    <span>Total Alerts</span>
+                    <span class="sys-val danger" id="sys-total-alerts">0</span>
+                  </div>
+                  <div class="sys-row">
+                    <span>Privacy Score</span>
+                    <span class="sys-val success">99%</span>
+                  </div>
+                  <div class="sys-row">
+                    <span>Model Classes</span>
+                    <span class="sys-val">5 classes</span>
+                  </div>
+                </div>
+              </div>
+              <div class="cam-footer">
+                <span class="cam-location">System Overview</span>
+                <span class="cam-detections success">All systems nominal</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ALERTS PAGE -->
+        <div id="page-alerts" class="page">
+          <div class="page-header">
+            <div>
+              <h2 class="page-title">Alert Log</h2>
+              <p class="page-sub">All detected anomalies across nodes</p>
+            </div>
+            <div class="header-actions">
+              <select id="alert-filter" class="filter-select" onchange="filterAlerts()">
+                <option value="all">All Events</option>
+                <option value="Arrest">Arrest</option>
+                <option value="Fighting">Fighting</option>
+                <option value="Shooting">Shooting</option>
+                <option value="Theft">Theft</option>
+                <option value="Vandalism">Vandalism</option>
+              </select>
+              <button class="btn-secondary" onclick="loadAlerts()">↻ Refresh</button>
+            </div>
+          </div>
+          <div class="alerts-summary">
+            <div class="summary-card danger">
+              <div class="summary-num" id="sum-total">0</div>
+              <div class="summary-label">Total Alerts</div>
+            </div>
+            <div class="summary-card warning">
+              <div class="summary-num" id="sum-fighting">0</div>
+              <div class="summary-label">Fighting</div>
+            </div>
+            <div class="summary-card danger">
+              <div class="summary-num" id="sum-theft">0</div>
+              <div class="summary-label">Theft</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-num" id="sum-vandalism">0</div>
+              <div class="summary-label">Vandalism</div>
+            </div>
+            <div class="summary-card danger">
+              <div class="summary-num" id="sum-shooting">0</div>
+              <div class="summary-label">Shooting</div>
+            </div>
+            <div class="summary-card warning">
+              <div class="summary-num" id="sum-arrest">0</div>
+              <div class="summary-label">Arrest</div>
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Timestamp</th>
+                  <th>Node</th>
+                  <th>Event Type</th>
+                  <th>Confidence</th>
+                  <th>Time in Video</th>
+                  <th>Video File</th>
+                </tr>
+              </thead>
+              <tbody id="alerts-tbody">
+                <tr><td colspan="7" class="loading-row">Loading alerts...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- FL TRAINING PAGE -->
+        <div id="page-fl-training" class="page">
+          <div class="page-header">
+            <div>
+              <h2 class="page-title">FL Training Dashboard</h2>
+              <p class="page-sub">Federated Learning performance metrics</p>
+            </div>
+            <button class="btn-secondary" onclick="loadTrainingHistory()">↻ Refresh</button>
+          </div>
+          <div class="fl-metrics">
+            <div class="metric-card">
+              <div class="metric-icon">◈</div>
+              <div class="metric-val" id="fl-rounds">5</div>
+              <div class="metric-label">Total Rounds</div>
+            </div>
+            <div class="metric-card success">
+              <div class="metric-icon">▲</div>
+              <div class="metric-val" id="fl-best-acc">--</div>
+              <div class="metric-label">Best Accuracy</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-icon">▼</div>
+              <div class="metric-val" id="fl-final-loss">--</div>
+              <div class="metric-label">Final Loss</div>
+            </div>
+            <div class="metric-card success">
+              <div class="metric-icon">↑</div>
+              <div class="metric-val" id="fl-improvement">--</div>
+              <div class="metric-label">Improvement</div>
+            </div>
+          </div>
+          <div class="charts-grid">
+            <div class="chart-card">
+              <div class="chart-title">Model Accuracy per Round</div>
+              <canvas id="accuracy-chart"></canvas>
+            </div>
+            <div class="chart-card">
+              <div class="chart-title">Loss Convergence</div>
+              <canvas id="loss-chart"></canvas>
+            </div>
+          </div>
+          <div class="fl-table-container">
+            <div class="chart-title">Round-by-Round Results</div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Round</th>
+                  <th>Accuracy</th>
+                  <th>Loss</th>
+                  <th>Improvement</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="fl-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- STACKELBERG PAGE -->
+        <div id="page-stackelberg" class="page">
+          <div class="page-header">
+            <div>
+              <h2 class="page-title">Stackelberg Game Visualizer</h2>
+              <p class="page-sub">Game-theoretic client scheduling & reputation management</p>
+            </div>
+          </div>
+          <div class="stackelberg-layout">
+            <div class="stack-left">
+              <div class="chart-card">
+                <div class="chart-title">Client Reputation Scores</div>
+                <canvas id="reputation-chart"></canvas>
+              </div>
+              <div class="stack-explain">
+                <div class="chart-title">How Stackelberg Works</div>
+                <div class="explain-steps">
+                  <div class="explain-step">
+                    <div class="step-num">01</div>
+                    <div class="step-text">
+                      <strong>Server (Leader)</strong> announces payment/incentive for each round
+                    </div>
+                  </div>
+                  <div class="explain-step">
+                    <div class="step-num">02</div>
+                    <div class="step-text">
+                      <strong>Clients (Followers)</strong> decide whether to participate based on their cost vs payment
+                    </div>
+                  </div>
+                  <div class="explain-step">
+                    <div class="step-num">03</div>
+                    <div class="step-text">
+                      <strong>Reputation</strong> tracks contribution quality — good updates raise score, bad ones lower it
+                    </div>
+                  </div>
+                  <div class="explain-step">
+                    <div class="step-num">04</div>
+                    <div class="step-text">
+                      <strong>Selection</strong> top 80% by reputation are chosen each round — malicious nodes get excluded
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="stack-right">
+              <div class="chart-card">
+                <div class="chart-title">Client Node Status</div>
+                <div class="client-cards" id="client-cards">
+                  <div class="client-node-card" id="node-card-0">
+                    <div class="node-header">
+                      <span class="node-id">CLIENT 0</span>
+                      <span class="node-badge selected">SELECTED</span>
+                    </div>
+                    <div class="node-reputation">
+                      <div class="rep-label">Reputation Score</div>
+                      <div class="rep-bar-container">
+                        <div class="rep-bar" id="rep-bar-0" style="width:50%"></div>
+                      </div>
+                      <div class="rep-val" id="rep-val-0">0.500</div>
+                    </div>
+                    <div class="node-stats">
+                      <div class="node-stat">
+                        <span>Rounds</span>
+                        <span id="node-rounds-0">0</span>
+                      </div>
+                      <div class="node-stat">
+                        <span>Status</span>
+                        <span class="success" id="node-status-0">Active</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="client-node-card" id="node-card-1">
+                    <div class="node-header">
+                      <span class="node-id">CLIENT 1</span>
+                      <span class="node-badge selected">SELECTED</span>
+                    </div>
+                    <div class="node-reputation">
+                      <div class="rep-label">Reputation Score</div>
+                      <div class="rep-bar-container">
+                        <div class="rep-bar" id="rep-bar-1" style="width:50%"></div>
+                      </div>
+                      <div class="rep-val" id="rep-val-1">0.500</div>
+                    </div>
+                    <div class="node-stats">
+                      <div class="node-stat">
+                        <span>Rounds</span>
+                        <span id="node-rounds-1">0</span>
+                      </div>
+                      <div class="node-stat">
+                        <span>Status</span>
+                        <span class="success" id="node-status-1">Active</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="client-node-card" id="node-card-2">
+                    <div class="node-header">
+                      <span class="node-id">CLIENT 2</span>
+                      <span class="node-badge">STANDBY</span>
+                    </div>
+                    <div class="node-reputation">
+                      <div class="rep-label">Reputation Score</div>
+                      <div class="rep-bar-container">
+                        <div class="rep-bar" id="rep-bar-2" style="width:50%"></div>
+                      </div>
+                      <div class="rep-val" id="rep-val-2">0.500</div>
+                    </div>
+                    <div class="node-stats">
+                      <div class="node-stat">
+                        <span>Rounds</span>
+                        <span id="node-rounds-2">0</span>
+                      </div>
+                      <div class="node-stat">
+                        <span>Status</span>
+                        <span class="success" id="node-status-2">Active</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="chart-card">
+                <div class="chart-title">Nash Equilibrium Analysis</div>
+                <div class="nash-info">
+                  <div class="nash-row">
+                    <span>Game Type</span>
+                    <span class="nash-val">Stackelberg (Leader-Follower)</span>
+                  </div>
+                  <div class="nash-row">
+                    <span>Leader</span>
+                    <span class="nash-val success">FL Server</span>
+                  </div>
+                  <div class="nash-row">
+                    <span>Followers</span>
+                    <span class="nash-val">3 Camera Nodes</span>
+                  </div>
+                  <div class="nash-row">
+                    <span>Strategy</span>
+                    <span class="nash-val">Reputation-Based Selection</span>
+                  </div>
+                  <div class="nash-row">
+                    <span>Equilibrium</span>
+                    <span class="nash-val success">Achieved ✓</span>
+                  </div>
+                  <div class="nash-row">
+                    <span>Privacy Preserved</span>
+                    <span class="nash-val success">Yes — No raw data shared</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CLIENT/SERVER MANAGER PAGE -->
+        <div id="page-manager" class="page">
+          <div class="page-header">
+            <div>
+              <h2 class="page-title">Client / Server Manager</h2>
+              <p class="page-sub">Control FL server and camera node clients</p>
+            </div>
+          </div>
+          <div class="manager-layout">
+            <div class="manager-left">
+              <!-- Server Control -->
+              <div class="control-card">
+                <div class="control-header">
+                  <div class="control-title">
+                    <span class="control-icon">⬡</span>
+                    FL Server
+                  </div>
+                  <span class="status-pill" id="server-status-pill">OFFLINE</span>
+                </div>
+                <div class="control-info">
+                  <div class="info-row"><span>Address</span><span>localhost:8085</span></div>
+                  <div class="info-row"><span>Rounds</span><span>5</span></div>
+                  <div class="info-row"><span>Min Clients</span><span>2</span></div>
+                  <div class="info-row"><span>Strategy</span><span>FedAvg + Stackelberg</span></div>
+                </div>
+                <div class="control-btns">
+                  <button class="btn-primary" id="server-start-btn" onclick="startServer()">▶ Start Server</button>
+                  <button class="btn-danger" id="server-stop-btn" onclick="stopServer()" disabled>⬛ Stop</button>
+                </div>
+              </div>
+
+              <!-- Client Controls -->
+              <div class="control-card">
+                <div class="control-header">
+                  <div class="control-title">
+                    <span class="control-icon">◉</span>
+                    Camera Nodes
+                  </div>
+                </div>
+                <div id="client-controls">
+                  <div class="client-control" id="ctrl-0">
+                    <div class="client-ctrl-header">
+                      <span>Client 0 — Node 1</span>
+                      <span class="status-pill" id="client-pill-0">OFFLINE</span>
+                    </div>
+                    <div class="client-ctrl-path" id="client-path-0">No footage selected</div>
+                    <div class="client-ctrl-btns">
+                      <button class="btn-secondary" onclick="selectClientFootage(0)">📁 Select Footage</button>
+                      <button class="btn-primary" onclick="startClient(0)" id="client-start-0">▶ Start</button>
+                      <button class="btn-danger" onclick="stopClient(0)" id="client-stop-0" disabled>⬛ Stop</button>
+                    </div>
+                  </div>
+                  <div class="client-control" id="ctrl-1">
+                    <div class="client-ctrl-header">
+                      <span>Client 1 — Node 2</span>
+                      <span class="status-pill" id="client-pill-1">OFFLINE</span>
+                    </div>
+                    <div class="client-ctrl-path" id="client-path-1">No footage selected</div>
+                    <div class="client-ctrl-btns">
+                      <button class="btn-secondary" onclick="selectClientFootage(1)">📁 Select Footage</button>
+                      <button class="btn-primary" onclick="startClient(1)" id="client-start-1">▶ Start</button>
+                      <button class="btn-danger" onclick="stopClient(1)" id="client-stop-1" disabled>⬛ Stop</button>
+                    </div>
+                  </div>
+                  <div class="client-control" id="ctrl-2">
+                    <div class="client-ctrl-header">
+                      <span>Client 2 — Node 3</span>
+                      <span class="status-pill" id="client-pill-2">OFFLINE</span>
+                    </div>
+                    <div class="client-ctrl-path" id="client-path-2">No footage selected</div>
+                    <div class="client-ctrl-btns">
+                      <button class="btn-secondary" onclick="selectClientFootage(2)">📁 Select Footage</button>
+                      <button class="btn-primary" onclick="startClient(2)" id="client-start-2">▶ Start</button>
+                      <button class="btn-danger" onclick="stopClient(2)" id="client-stop-2" disabled>⬛ Stop</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Terminal Output -->
+            <div class="manager-right">
+              <div class="terminal-card">
+                <div class="terminal-header">
+                  <span>● SYSTEM TERMINAL</span>
+                  <button onclick="clearTerminal()" class="term-clear">Clear</button>
+                </div>
+                <div class="terminal-body" id="terminal-output">
+                  <div class="term-line"><span class="term-prompt">ARES $</span> System ready. Start server to begin FL training.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- UPLOAD PAGE -->
+        <div id="page-upload" class="page">
+          <div class="page-header">
+            <div>
+              <h2 class="page-title">Upload Footage</h2>
+              <p class="page-sub">Upload CCTV footage for each camera node</p>
+            </div>
+          </div>
+          <div class="upload-grid">
+            <div class="upload-card" id="upload-card-0">
+              <div class="upload-node-label">NODE 01 — Client 0</div>
+              <div class="upload-zone" onclick="uploadForClient(0)" id="upload-zone-0">
+                <div class="upload-icon">↑</div>
+                <div class="upload-text">Click to upload footage</div>
+                <div class="upload-sub">MP4, AVI, MOV supported</div>
+              </div>
+              <div class="upload-status hidden" id="upload-status-0">
+                <div class="upload-progress-bar">
+                  <div class="upload-progress-fill" id="upload-fill-0"></div>
+                </div>
+                <div class="upload-result" id="upload-result-0"></div>
+              </div>
+            </div>
+            <div class="upload-card" id="upload-card-1">
+              <div class="upload-node-label">NODE 02 — Client 1</div>
+              <div class="upload-zone" onclick="uploadForClient(1)" id="upload-zone-1">
+                <div class="upload-icon">↑</div>
+                <div class="upload-text">Click to upload footage</div>
+                <div class="upload-sub">MP4, AVI, MOV supported</div>
+              </div>
+              <div class="upload-status hidden" id="upload-status-1">
+                <div class="upload-progress-bar">
+                  <div class="upload-progress-fill" id="upload-fill-1"></div>
+                </div>
+                <div class="upload-result" id="upload-result-1"></div>
+              </div>
+            </div>
+            <div class="upload-card" id="upload-card-2">
+              <div class="upload-node-label">NODE 03 — Client 2</div>
+              <div class="upload-zone" onclick="uploadForClient(2)" id="upload-zone-2">
+                <div class="upload-icon">↑</div>
+                <div class="upload-text">Click to upload footage</div>
+                <div class="upload-sub">MP4, AVI, MOV supported</div>
+              </div>
+              <div class="upload-status hidden" id="upload-status-2">
+                <div class="upload-progress-bar">
+                  <div class="upload-progress-fill" id="upload-fill-2"></div>
+                </div>
+                <div class="upload-result" id="upload-result-2"></div>
+              </div>
+            </div>
+          </div>
+          <div class="upload-log-card">
+            <div class="chart-title">Detection Results</div>
+            <div id="upload-detections" class="detection-log">
+              <div class="detection-empty">Upload footage above to see detection results</div>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="src/app.js"></script>
+</body>
+</html>

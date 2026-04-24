@@ -1,0 +1,11 @@
+dashboard/node_modules/
+node_modules/
+.venv/
+__pycache__/
+*.db
+uploads/
+footage/
+outputs/
+yolov8n.pt
+*.pt
+alerts.db
