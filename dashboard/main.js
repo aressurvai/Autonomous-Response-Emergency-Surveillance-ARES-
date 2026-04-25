@@ -10,7 +10,35 @@ let flServerProcess = null;
 let clientProcesses = {};
 
 // ── Resolve venv Python ──
-const VENV_PYTHON = 'C:/Users/munhib/OneDrive/Desktop/FYP/ARES-without/.venv/Scripts/python.exe';
+function findPython() {
+  const projectRoot = path.resolve(__dirname, '..');
+  const venvPaths = [
+    path.join(projectRoot, '.venv', 'Scripts', 'python.exe'),  // Windows
+    path.join(projectRoot, '.venv', 'bin', 'python'),          // Mac/Linux
+    path.join(projectRoot, 'venv', 'Scripts', 'python.exe'),   // Windows alt name
+    path.join(projectRoot, 'venv', 'bin', 'python'),           // Mac/Linux alt name
+  ];
+ 
+  for (const p of venvPaths) {
+    if (fs.existsSync(p)) return p;
+  }
+ 
+  try {
+    const sysPython = execSync('where python', { stdio: 'pipe' })
+      .toString().trim().split('\n')[0];  // Windows
+    if (sysPython) return sysPython;
+  } catch {
+    try {
+      const sysPython = execSync('which python3', { stdio: 'pipe' })
+        .toString().trim();              // Mac/Linux
+      if (sysPython) return sysPython;
+    } catch { /* nothing found */ }
+  }
+ 
+  throw new Error('Python not found. Please create a venv or install Python.');
+}
+ 
+const VENV_PYTHON = findPython();
 
 // ── Get local IP address ──
 function getLocalIP() {
