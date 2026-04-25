@@ -66,7 +66,16 @@ class ARESStrategy(fl.server.strategy.FedAvg):
                 import torch
                 from ultralytics import YOLO
 
-                global_model = YOLO(os.path.join(BASE_DIR, "model", "best.pt"))
+                global_path   = os.path.join(BASE_DIR, "model", "global_model.pt")
+                fallback_path = os.path.join(BASE_DIR, "model", "best.pt")
+                checkpoint    = global_path if os.path.exists(global_path) else fallback_path
+
+                if checkpoint == global_path:
+                    print(f"  ↻ Building on existing global_model.pt")
+                else:
+                    print(f"  ↻ First round — initialising from best.pt")
+
+                global_model = YOLO(checkpoint)                                   # ← fixed
                 parameters   = aggregated[0]
                 weights      = flwr.common.parameters_to_ndarrays(parameters)
 
@@ -110,7 +119,7 @@ if __name__ == "__main__":
     print("(Start your client terminals now)\n")
 
     fl.server.start_server(
-        server_address="0.0.0.0:8081",
+        server_address="0.0.0.0:8089",
         config=fl.server.ServerConfig(num_rounds=NUM_ROUNDS),
         strategy=ARESStrategy()
     )
