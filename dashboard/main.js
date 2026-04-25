@@ -18,11 +18,11 @@ function findPython() {
     path.join(projectRoot, 'venv', 'Scripts', 'python.exe'),   // Windows alt name
     path.join(projectRoot, 'venv', 'bin', 'python'),           // Mac/Linux alt name
   ];
- 
+
   for (const p of venvPaths) {
     if (fs.existsSync(p)) return p;
   }
- 
+
   try {
     const sysPython = execSync('where python', { stdio: 'pipe' })
       .toString().trim().split('\n')[0];  // Windows
