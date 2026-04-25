@@ -9,6 +9,9 @@ let mainWindow;
 let flServerProcess = null;
 let clientProcesses = {};
 
+// ── Resolve venv Python ──
+const VENV_PYTHON = 'C:/Users/munhib/OneDrive/Desktop/FYP/ARES-without/.venv/Scripts/python.exe';
+
 // ── Get local IP address ──
 function getLocalIP() {
   const interfaces = os.networkInterfaces();
@@ -94,6 +97,16 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
+
+//for testing 
+ipcMain.on('test-python', (event) => {
+  const test = spawn(VENV_PYTHON, ['--version'], { shell: false });
+  test.stdout.on('data', d => console.log('PYTHON STDOUT:', d.toString()));
+  test.stderr.on('data', d => console.log('PYTHON STDERR:', d.toString()));
+  test.on('error', e => console.log('SPAWN ERROR:', e.message));
+  test.on('close', c => console.log('EXIT CODE:', c));
+});
+
 // Window controls
 ipcMain.on('minimize-window', () => mainWindow.minimize());
 ipcMain.on('maximize-window', () => {
@@ -118,6 +131,7 @@ ipcMain.handle('get-qr', async () => {
   return { qrDataUrl, url };
 });
 
+
 // File dialog for video selection
 ipcMain.handle('select-video', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -137,12 +151,13 @@ ipcMain.on('start-fl-server', (event) => {
   const aresPath = path.join(__dirname, '../server');
   event.sender.send('server-log', '🚀 Starting FL Server...');
 
-  flServerProcess = spawn('python', ['fl_server.py'], {
+  const pythonPath = path.join(__dirname, '../.venv/Scripts/python.exe');
+
+  flServerProcess = spawn(VENV_PYTHON, ['fl_server.py'], {   // ← changed
     cwd: aresPath,
     env: { ...process.env },
-    shell: true
-  });
-
+    shell: false                                               // ← changed
+  })
   flServerProcess.stdout.on('data', (data) => {
     event.sender.send('server-log', data.toString());
   });
@@ -178,14 +193,16 @@ ipcMain.on('start-fl-client', (event, { clientId, videoPath }) => {
   }
 
   const aresPath = path.join(__dirname, '..');
-  const proc = spawn('python', [
+  const pythonPath = path.join(__dirname, '../.venv/Scripts/python.exe');
+
+  const proc = spawn(VENV_PYTHON, [                          // ← changed
     'client/fl_client.py',
     String(clientId),
     videoPath
   ], {
     cwd: aresPath,
     env: { ...process.env },
-    shell: true
+    shell: false                                              // ← changed
   });
 
   clientProcesses[clientId] = proc;

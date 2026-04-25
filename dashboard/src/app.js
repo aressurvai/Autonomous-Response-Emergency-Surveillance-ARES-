@@ -52,6 +52,15 @@ try {
   // QR CODE — auto show when ready
   ipcRenderer.on('qr-ready', (_, { qrDataUrl, url }) => {
     showQRModal(qrDataUrl, url);
+    const img         = document.getElementById('sidebar-qr-image');
+    const placeholder = document.getElementById('sidebar-qr-placeholder');
+    const urlLabel    = document.getElementById('sidebar-qr-url');
+    if (img) {
+      img.src                   = qrDataUrl;
+      img.style.display         = 'block';
+      if (placeholder) placeholder.style.display = 'none';
+    }
+    if (urlLabel) urlLabel.textContent = url;
   });
 
 } catch (e) {
@@ -60,6 +69,8 @@ try {
 
 // ── QR CODE FUNCTIONS ──
 function showQRModal(qrDataUrl, url) {
+  if (document.getElementById('login-screen').classList.contains('active')) return;
+
   const existing = document.getElementById('qr-modal');
   if (existing) existing.remove();
 
@@ -86,6 +97,19 @@ function showQRModal(qrDataUrl, url) {
       DISMISS
     </button>
   `;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'qr-overlay';
+  overlay.style.cssText = `
+    position:fixed; inset:0; z-index:9998;
+    background:rgba(0,0,0,0.5);
+  `;  
+  overlay.onclick = () => {
+    modal.remove();
+    overlay.remove();
+  };
+
+  document.body.appendChild(overlay);
   document.body.appendChild(modal);
 }
 
@@ -93,6 +117,15 @@ async function showQR() {
   if (ipcRenderer) {
     const { qrDataUrl, url } = await ipcRenderer.invoke('get-qr');
     showQRModal(qrDataUrl, url);
+    const img         = document.getElementById('sidebar-qr-image');
+    const placeholder = document.getElementById('sidebar-qr-placeholder');
+    const urlLabel    = document.getElementById('sidebar-qr-url');
+    if (img) {
+      img.src                   = qrDataUrl;
+      img.style.display         = 'block';
+      if (placeholder) placeholder.style.display = 'none';
+    }
+    if (urlLabel) urlLabel.textContent = url;
   }
 }
 

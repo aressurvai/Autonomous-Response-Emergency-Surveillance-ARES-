@@ -63,13 +63,6 @@
         <button onclick="minimizeWindow()">─</button>
         <button onclick="maximizeWindow()">□</button>
         <button onclick="closeWindow()" class="close-btn">✕</button>
-        <button onclick="showQR()" style="
-  background:transparent; border:1px solid #00ff9d; color:#00ff9d;
-  padding:4px 14px; cursor:pointer; font-family:'Share Tech Mono',monospace;
-  font-size:10px; letter-spacing:1px; border-radius:2px; margin-right:8px;
-  -webkit-app-region: no-drag;">
-  MOBILE QR
-</button>
       </div>
     </div>
 
@@ -83,28 +76,43 @@
             <div class="user-role">System Operator</div>
           </div>
         </div>
+        
         <div class="nav-section-label">MONITORING</div>
+        
         <button class="nav-item active" onclick="navigate('dashboard')" data-page="dashboard">
           <span class="nav-icon">◉</span> Dashboard
         </button>
+        
         <button class="nav-item" onclick="navigate('alerts')" data-page="alerts">
           <span class="nav-icon">⚠</span> Alerts
           <span class="nav-badge" id="alerts-badge">0</span>
         </button>
+        
         <div class="nav-section-label">FEDERATED LEARNING</div>
+        
         <button class="nav-item" onclick="navigate('fl-training')" data-page="fl-training">
           <span class="nav-icon">◈</span> FL Training
         </button>
+        
         <button class="nav-item" onclick="navigate('stackelberg')" data-page="stackelberg">
           <span class="nav-icon">◆</span> Stackelberg
         </button>
+        
         <button class="nav-item" onclick="navigate('manager')" data-page="manager">
           <span class="nav-icon">⬡</span> Client/Server
         </button>
+
         <div class="nav-section-label">OPERATIONS</div>
         <button class="nav-item" onclick="navigate('upload')" data-page="upload">
           <span class="nav-icon">↑</span> Upload Footage
         </button>
+
+        <div class="nav-section-label">MOBILE ACCESS</div>
+        <button class="nav-item" onclick="showQR()">
+          <span class="nav-icon">▦</span> Show QR Code
+        </button>
+
+        <div class="sidebar-bottom">
         <div class="sidebar-bottom">
           <button class="nav-item logout-btn" onclick="handleLogout()">
             <span class="nav-icon">⏻</span> Logout

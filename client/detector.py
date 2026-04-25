@@ -4,7 +4,17 @@ from ultralytics import YOLO
 import cv2
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-model = YOLO(os.path.join(BASE_DIR, "model", "best.pt"))
+
+def _load_model():
+    global_path   = os.path.join(BASE_DIR, "model", "global_model.pt")
+    fallback_path = os.path.join(BASE_DIR, "model", "best.pt")
+    if os.path.exists(global_path):
+        print("[ARES] detector: loading global_model.pt")
+        return YOLO(global_path)
+    print("[ARES] detector: global_model.pt not found, using best.pt")
+    return YOLO(fallback_path)
+
+model = _load_model()
 
 ANOMALY_CLASSES = ["Arrest", "Fighting", "Shooting", "Theft", "Vandalism"]
 
