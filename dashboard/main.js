@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { spawn, execSync } = require('child_process');
 const path = require('path');
-const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const QRCode = require('qrcode');
@@ -10,12 +10,39 @@ let flServerProcess = null;
 let clientProcesses = {};
 
 // ── Resolve venv Python ──
-const VENV_PYTHON = 'C:/Users/munhib/OneDrive/Desktop/FYP/ARES-without/.venv/Scripts/python.exe';
+function findPython() {
+  const projectRoot = path.resolve(__dirname, '..');
+  const venvPaths = [
+    path.join(projectRoot, '.venv', 'Scripts', 'python.exe'),
+    path.join(projectRoot, '.venv', 'bin', 'python'),
+    path.join(projectRoot, 'venv', 'Scripts', 'python.exe'),
+    path.join(projectRoot, 'venv', 'bin', 'python'),
+  ];
+
+  for (const p of venvPaths) {
+    if (fs.existsSync(p)) return p;
+  }
+
+  try {
+    const sysPython = execSync('where python', { stdio: 'pipe' })
+      .toString().trim().split('\n')[0];
+    if (sysPython) return sysPython;
+  } catch {
+    try {
+      const sysPython = execSync('which python3', { stdio: 'pipe' })
+        .toString().trim();
+      if (sysPython) return sysPython;
+    } catch { /* nothing found */ }
+  }
+
+  throw new Error('Python not found. Please create a venv or install Python.');
+}
+
+const VENV_PYTHON = findPython();
 
 // ── Get local IP address ──
 function getLocalIP() {
   const interfaces = os.networkInterfaces();
-
   let fallback = null;
 
   for (const name of Object.keys(interfaces)) {
@@ -24,16 +51,12 @@ function getLocalIP() {
     for (const iface of interfaces[name]) {
       if (iface.family !== 'IPv4' || iface.internal) continue;
 
-      // ❌ Skip VMware / Virtual adapters
       if (
         lower.includes('vmware') ||
         lower.includes('virtual') ||
         lower.includes('loopback')
-      ) {
-        continue;
-      }
+      ) continue;
 
-      // ✅ PRIORITY: WiFi
       if (
         lower.includes('wi-fi') ||
         lower.includes('wifi') ||
@@ -43,10 +66,7 @@ function getLocalIP() {
         return iface.address;
       }
 
-      // Save as fallback (Ethernet etc.)
-      if (!fallback) {
-        fallback = iface.address;
-      }
+      if (!fallback) fallback = iface.address;
     }
   }
 
@@ -72,7 +92,6 @@ function createWindow() {
   mainWindow.loadFile('index.html');
   mainWindow.setMenuBarVisibility(false);
 
-  // Send QR code to renderer after window loads
   mainWindow.webContents.on('did-finish-load', async () => {
     const ip = getLocalIP();
     const url = `http://${ip}:8000`;
@@ -97,8 +116,7 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-
-//for testing 
+// for testing
 ipcMain.on('test-python', (event) => {
   const test = spawn(VENV_PYTHON, ['--version'], { shell: false });
   test.stdout.on('data', d => console.log('PYTHON STDOUT:', d.toString()));
@@ -131,7 +149,6 @@ ipcMain.handle('get-qr', async () => {
   return { qrDataUrl, url };
 });
 
-
 // File dialog for video selection
 ipcMain.handle('select-video', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -151,13 +168,12 @@ ipcMain.on('start-fl-server', (event) => {
   const aresPath = path.join(__dirname, '../server');
   event.sender.send('server-log', '🚀 Starting FL Server...');
 
-  const pythonPath = path.join(__dirname, '../.venv/Scripts/python.exe');
-
-  flServerProcess = spawn(VENV_PYTHON, ['fl_server.py'], {   // ← changed
+  flServerProcess = spawn(VENV_PYTHON, ['fl_server.py'], {
     cwd: aresPath,
     env: { ...process.env },
-    shell: false                                               // ← changed
-  })
+    shell: false
+  });
+
   flServerProcess.stdout.on('data', (data) => {
     event.sender.send('server-log', data.toString());
   });
@@ -193,16 +209,15 @@ ipcMain.on('start-fl-client', (event, { clientId, videoPath }) => {
   }
 
   const aresPath = path.join(__dirname, '..');
-  const pythonPath = path.join(__dirname, '../.venv/Scripts/python.exe');
 
-  const proc = spawn(VENV_PYTHON, [                          // ← changed
+  const proc = spawn(VENV_PYTHON, [
     'client/fl_client.py',
     String(clientId),
     videoPath
   ], {
     cwd: aresPath,
     env: { ...process.env },
-    shell: false                                              // ← changed
+    shell: false
   });
 
   clientProcesses[clientId] = proc;
