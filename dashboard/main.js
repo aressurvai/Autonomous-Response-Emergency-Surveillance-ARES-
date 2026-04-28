@@ -49,7 +49,7 @@ function getLocalIP() {
     const lower = name.toLowerCase();
 
     for (const iface of interfaces[name]) {
-      if (iface.family !== 'IPv4' || iface.internal) continue;
+      if (iface.family !== "IPv4" || iface.internal) continue;
 
       if (
         lower.includes('vmware') ||
@@ -58,10 +58,10 @@ function getLocalIP() {
       ) continue;
 
       if (
-        lower.includes('wi-fi') ||
-        lower.includes('wifi') ||
-        lower.includes('wlan') ||
-        lower.includes('wireless')
+        lower.includes("wi-fi") ||
+        lower.includes("wifi") ||
+        lower.includes("wlan") ||
+        lower.includes("wireless")
       ) {
         return iface.address;
       }
@@ -70,7 +70,7 @@ function getLocalIP() {
     }
   }
 
-  return fallback || '127.0.0.1';
+  return fallback || "127.0.0.1";
 }
 
 function createWindow() {
@@ -80,16 +80,17 @@ function createWindow() {
     minWidth: 1200,
     minHeight: 700,
     frame: false,
-    titleBarStyle: 'hidden',
-    backgroundColor: '#050a0f',
+    titleBarStyle: "hidden",
+    backgroundColor: "#050a0f",
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      enableRemoteModule: true
-    }
+      enableRemoteModule: true,
+      webSecurity: false,
+    },
   });
 
-  mainWindow.loadFile('index.html');
+  mainWindow.loadFile("index.html");
   mainWindow.setMenuBarVisibility(false);
 
   mainWindow.webContents.on('did-finish-load', async () => {
@@ -99,21 +100,21 @@ function createWindow() {
       const qrDataUrl = await QRCode.toDataURL(url, {
         width: 200,
         margin: 2,
-        color: { dark: '#00ff9d', light: '#050a0f' }
+        color: { dark: "#00ff9d", light: "#050a0f" },
       });
-      mainWindow.webContents.send('qr-ready', { qrDataUrl, url });
+      mainWindow.webContents.send("qr-ready", { qrDataUrl, url });
     } catch (err) {
-      console.error('QR generation failed:', err);
+      console.error("QR generation failed:", err);
     }
   });
 }
 
 app.whenReady().then(createWindow);
 
-app.on('window-all-closed', () => {
+app.on("window-all-closed", () => {
   if (flServerProcess) flServerProcess.kill();
-  Object.values(clientProcesses).forEach(p => p.kill());
-  if (process.platform !== 'darwin') app.quit();
+  Object.values(clientProcesses).forEach((p) => p.kill());
+  if (process.platform !== "darwin") app.quit();
 });
 
 // for testing
@@ -126,42 +127,94 @@ ipcMain.on('test-python', (event) => {
 });
 
 // Window controls
-ipcMain.on('minimize-window', () => mainWindow.minimize());
-ipcMain.on('maximize-window', () => {
+ipcMain.on("minimize-window", () => mainWindow.minimize());
+ipcMain.on("maximize-window", () => {
   if (mainWindow.isMaximized()) mainWindow.unmaximize();
   else mainWindow.maximize();
 });
-ipcMain.on('close-window', () => {
+ipcMain.on("close-window", () => {
   if (flServerProcess) flServerProcess.kill();
-  Object.values(clientProcesses).forEach(p => p.kill());
+  Object.values(clientProcesses).forEach((p) => p.kill());
   app.quit();
 });
 
 // Get QR on demand
-ipcMain.handle('get-qr', async () => {
+ipcMain.handle("get-qr", async () => {
   const ip = getLocalIP();
   const url = `http://${ip}:8000`;
   const qrDataUrl = await QRCode.toDataURL(url, {
     width: 200,
     margin: 2,
-    color: { dark: '#00ff9d', light: '#050a0f' }
+    color: { dark: "#00ff9d", light: "#050a0f" },
   });
   return { qrDataUrl, url };
 });
 
 // File dialog for video selection
-ipcMain.handle('select-video', async () => {
+ipcMain.handle("select-video", async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openFile'],
-    filters: [{ name: 'Videos', extensions: ['mp4', 'avi', 'mov', 'mkv'] }]
+    properties: ["openFile"],
+    filters: [{ name: "Videos", extensions: ["mp4", "avi", "mov", "mkv"] }],
   });
   return result.filePaths[0] || null;
 });
 
+// Add this block to dashboard/main.js
+// Place it just before the "Start FL Client" ipcMain.on block
+
+// ── Stream servers (one per client, MJPEG for dashboard display) ───────────────
+const streamProcesses = {}; // { clientId: ChildProcess }
+const STREAM_BASE_PORT = 8081; // client0=8081, client1=8082, client2=8083
+
+ipcMain.on("start-stream-server", (event, { clientId, source }) => {
+  const port = STREAM_BASE_PORT + clientId;
+
+  // Kill existing stream for this client if any
+  if (streamProcesses[clientId]) {
+    streamProcesses[clientId].kill();
+    delete streamProcesses[clientId];
+  }
+
+  const cwd = path.join(__dirname, "..");
+  const proc = spawn(
+    VENV_PYTHON,
+    ["client/stream_server.py", String(source), String(port)],
+    { cwd, shell: false, env: { ...process.env } },
+  );
+
+  streamProcesses[clientId] = proc;
+
+  proc.stdout.on("data", (d) =>
+    event.sender.send("client-log", { clientId, msg: d.toString() }),
+  );
+  proc.stderr.on("data", (d) =>
+    event.sender.send("client-log", { clientId, msg: d.toString() }),
+  );
+  proc.on("close", () => {
+    delete streamProcesses[clientId];
+  });
+
+  // Tell renderer which URL to use for this client's feed
+  event.sender.send("stream-ready", {
+    clientId,
+    url: `http://localhost:${port}/stream`,
+  });
+});
+
+ipcMain.on("stop-stream-server", (_, clientId) => {
+  if (streamProcesses[clientId]) {
+    streamProcesses[clientId].kill();
+    delete streamProcesses[clientId];
+  }
+});
+
+// Also kill stream servers on app close — add to your existing killAll() function:
+// Object.values(streamProcesses).forEach(p => p.kill());
+
 // Start FL Server
-ipcMain.on('start-fl-server', (event) => {
+ipcMain.on("start-fl-server", (event) => {
   if (flServerProcess) {
-    event.sender.send('server-log', 'Server already running');
+    event.sender.send("server-log", "Server already running");
     return;
   }
 
@@ -177,34 +230,37 @@ ipcMain.on('start-fl-server', (event) => {
   flServerProcess.stdout.on('data', (data) => {
     event.sender.send('server-log', data.toString());
   });
-  flServerProcess.stderr.on('data', (data) => {
-    event.sender.send('server-log', data.toString());
+  flServerProcess.stderr.on("data", (data) => {
+    event.sender.send("server-log", data.toString());
   });
-  flServerProcess.on('close', (code) => {
-    event.sender.send('server-log', `Server stopped (code ${code})`);
+  flServerProcess.on("close", (code) => {
+    event.sender.send("server-log", `Server stopped (code ${code})`);
     flServerProcess = null;
-    event.sender.send('server-stopped');
+    event.sender.send("server-stopped");
   });
-  flServerProcess.on('error', (err) => {
-    event.sender.send('server-log', `❌ Error: ${err.message}`);
+  flServerProcess.on("error", (err) => {
+    event.sender.send("server-log", `❌ Error: ${err.message}`);
     flServerProcess = null;
-    event.sender.send('server-stopped');
+    event.sender.send("server-stopped");
   });
 });
 
 // Stop FL Server
-ipcMain.on('stop-fl-server', (event) => {
+ipcMain.on("stop-fl-server", (event) => {
   if (flServerProcess) {
     flServerProcess.kill();
     flServerProcess = null;
-    event.sender.send('server-log', '⛔ Server stopped');
+    event.sender.send("server-log", "⛔ Server stopped");
   }
 });
 
 // Start FL Client
-ipcMain.on('start-fl-client', (event, { clientId, videoPath }) => {
+ipcMain.on("start-fl-client", (event, { clientId, videoPath }) => {
   if (clientProcesses[clientId]) {
-    event.sender.send('client-log', { clientId, msg: 'Client already running' });
+    event.sender.send("client-log", {
+      clientId,
+      msg: "Client already running",
+    });
     return;
   }
 
@@ -221,40 +277,52 @@ ipcMain.on('start-fl-client', (event, { clientId, videoPath }) => {
   });
 
   clientProcesses[clientId] = proc;
-  event.sender.send('client-log', { clientId, msg: `🎥 Client ${clientId} started` });
+  event.sender.send("client-log", {
+    clientId,
+    msg: `🎥 Client ${clientId} started`,
+  });
 
-  proc.stdout.on('data', (data) => {
-    event.sender.send('client-log', { clientId, msg: data.toString() });
+  proc.stdout.on("data", (data) => {
+    event.sender.send("client-log", { clientId, msg: data.toString() });
   });
-  proc.stderr.on('data', (data) => {
-    event.sender.send('client-log', { clientId, msg: data.toString() });
+  proc.stderr.on("data", (data) => {
+    event.sender.send("client-log", { clientId, msg: data.toString() });
   });
-  proc.on('close', (code) => {
+  proc.on("close", (code) => {
     delete clientProcesses[clientId];
-    event.sender.send('client-log', { clientId, msg: `Client ${clientId} finished (code ${code})` });
-    event.sender.send('client-stopped', clientId);
+    event.sender.send("client-log", {
+      clientId,
+      msg: `Client ${clientId} finished (code ${code})`,
+    });
+    event.sender.send("client-stopped", clientId);
   });
-  proc.on('error', (err) => {
-    event.sender.send('client-log', { clientId, msg: `❌ Error: ${err.message}` });
+  proc.on("error", (err) => {
+    event.sender.send("client-log", {
+      clientId,
+      msg: `❌ Error: ${err.message}`,
+    });
     delete clientProcesses[clientId];
-    event.sender.send('client-stopped', clientId);
+    event.sender.send("client-stopped", clientId);
   });
 });
 
 // Stop FL Client
-ipcMain.on('stop-fl-client', (event, clientId) => {
+ipcMain.on("stop-fl-client", (event, clientId) => {
   if (clientProcesses[clientId]) {
     clientProcesses[clientId].kill();
     delete clientProcesses[clientId];
-    event.sender.send('client-log', { clientId, msg: `⛔ Client ${clientId} stopped` });
+    event.sender.send("client-log", {
+      clientId,
+      msg: `⛔ Client ${clientId} stopped`,
+    });
   }
 });
 
 // Read training history from file
-ipcMain.handle('get-training-history', () => {
+ipcMain.handle("get-training-history", () => {
   try {
-    const filePath = path.join(__dirname, '../outputs/training_history.json');
-    const data = fs.readFileSync(filePath, 'utf8');
+    const filePath = path.join(__dirname, "../outputs/training_history.json");
+    const data = fs.readFileSync(filePath, "utf8");
     return JSON.parse(data);
   } catch {
     return [];
