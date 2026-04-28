@@ -5,6 +5,9 @@ from pydantic import BaseModel
 import shutil, os, sys, json, sqlite3, socket
 from datetime import datetime
 
+from fastapi import BackgroundTasks
+import threading
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from client.detector import process_video
 
@@ -169,3 +172,47 @@ def print_connection_info():
     print("="*50 + "\n")
 
 print_connection_info()
+
+from fastapi import BackgroundTasks
+import threading
+
+@app.post("/start-live-detection/{client_id}")
+async def start_live_detection(client_id: str, body: dict):
+    source = body.get("source", "")
+    max_frames = int(body.get("max_frames", 500))
+    
+    print(f"[ARES] Live detection starting — source: {source}, max_frames: {max_frames}")
+    
+    alerts = process_video(
+        video_path=source,
+        client_id=client_id,
+        sample_every=5,   # ← sample every 5th frame instead of 10th (catches more on live)
+        max_frames=max_frames,
+        conf=0.40          # ← lower threshold for live streams
+    )
+    
+    print(f"[ARES] Live detection done — {len(alerts)} alerts")
+    
+    conn = sqlite3.connect("alerts.db")
+    for alert in alerts:
+        conn.execute("""
+            INSERT INTO alerts (timestamp, client_id, event_type, confidence, frame_time, video_name)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            datetime.now().isoformat(),
+            client_id,
+            alert["event_type"],
+            alert["confidence"],
+            alert["timestamp"],
+            source
+        ))
+    conn.commit()
+    conn.close()
+    
+    return {
+        "status": "success",
+        "client_id": client_id,
+        "source": source,
+        "total_detections": len(alerts),
+        "alerts": alerts
+    }
