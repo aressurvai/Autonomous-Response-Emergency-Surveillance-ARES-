@@ -1,9 +1,9 @@
-const { app, BrowserWindow, ipcMain, dialog } = require("electron");
-const { spawn, execSync } = require("child_process");
-const path = require("path");
-const fs = require("fs");
-const os = require("os");
-const QRCode = require("qrcode");
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { spawn, execSync } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+const QRCode = require('qrcode');
 
 let mainWindow;
 let flServerProcess = null;
@@ -11,12 +11,12 @@ let clientProcesses = {};
 
 // ── Resolve venv Python ──
 function findPython() {
-  const projectRoot = path.resolve(__dirname, "..");
+  const projectRoot = path.resolve(__dirname, '..');
   const venvPaths = [
-    path.join(projectRoot, ".venv", "Scripts", "python.exe"),
-    path.join(projectRoot, ".venv", "bin", "python"),
-    path.join(projectRoot, "venv", "Scripts", "python.exe"),
-    path.join(projectRoot, "venv", "bin", "python"),
+    path.join(projectRoot, '.venv', 'Scripts', 'python.exe'),
+    path.join(projectRoot, '.venv', 'bin', 'python'),
+    path.join(projectRoot, 'venv', 'Scripts', 'python.exe'),
+    path.join(projectRoot, 'venv', 'bin', 'python'),
   ];
 
   for (const p of venvPaths) {
@@ -24,23 +24,18 @@ function findPython() {
   }
 
   try {
-    const sysPython = execSync("where python", { stdio: "pipe" })
-      .toString()
-      .trim()
-      .split("\n")[0];
+    const sysPython = execSync('where python', { stdio: 'pipe' })
+      .toString().trim().split('\n')[0];
     if (sysPython) return sysPython;
   } catch {
     try {
-      const sysPython = execSync("which python3", { stdio: "pipe" })
-        .toString()
-        .trim();
+      const sysPython = execSync('which python3', { stdio: 'pipe' })
+        .toString().trim();
       if (sysPython) return sysPython;
-    } catch {
-      /* nothing found */
-    }
+    } catch { /* nothing found */ }
   }
 
-  throw new Error("Python not found. Please create a venv or install Python.");
+  throw new Error('Python not found. Please create a venv or install Python.');
 }
 
 const VENV_PYTHON = findPython();
@@ -57,11 +52,10 @@ function getLocalIP() {
       if (iface.family !== "IPv4" || iface.internal) continue;
 
       if (
-        lower.includes("vmware") ||
-        lower.includes("virtual") ||
-        lower.includes("loopback")
-      )
-        continue;
+        lower.includes('vmware') ||
+        lower.includes('virtual') ||
+        lower.includes('loopback')
+      ) continue;
 
       if (
         lower.includes("wi-fi") ||
@@ -99,7 +93,7 @@ function createWindow() {
   mainWindow.loadFile("index.html");
   mainWindow.setMenuBarVisibility(false);
 
-  mainWindow.webContents.on("did-finish-load", async () => {
+  mainWindow.webContents.on('did-finish-load', async () => {
     const ip = getLocalIP();
     const url = `http://${ip}:8000`;
     try {
@@ -124,17 +118,12 @@ app.on("window-all-closed", () => {
 });
 
 // for testing
-ipcMain.on("test-python", (event) => {
-  const test = spawn(VENV_PYTHON, ["--version"], { shell: false });
-  test.stdout.on("data", (d) => console.log("PYTHON STDOUT:", d.toString()));
-  test.stderr.on("data", (d) => console.log("PYTHON STDERR:", d.toString()));
-  test.on("error", (e) => console.log("SPAWN ERROR:", e.message));
-  test.on("close", (c) => console.log("EXIT CODE:", c));
-});
-
-// Allow renderer to pass a raw source string (RTSP URL, webcam index, file path)
-ipcMain.handle("set-client-source", async (_, { clientId, source }) => {
-  return { clientId, source };
+ipcMain.on('test-python', (event) => {
+  const test = spawn(VENV_PYTHON, ['--version'], { shell: false });
+  test.stdout.on('data', d => console.log('PYTHON STDOUT:', d.toString()));
+  test.stderr.on('data', d => console.log('PYTHON STDERR:', d.toString()));
+  test.on('error', e => console.log('SPAWN ERROR:', e.message));
+  test.on('close', c => console.log('EXIT CODE:', c));
 });
 
 // Window controls
@@ -229,17 +218,17 @@ ipcMain.on("start-fl-server", (event) => {
     return;
   }
 
-  const aresPath = path.join(__dirname, "../server");
-  event.sender.send("server-log", "🚀 Starting FL Server...");
+  const aresPath = path.join(__dirname, '../server');
+  event.sender.send('server-log', '🚀 Starting FL Server...');
 
-  flServerProcess = spawn(VENV_PYTHON, ["fl_server.py"], {
+  flServerProcess = spawn(VENV_PYTHON, ['fl_server.py'], {
     cwd: aresPath,
     env: { ...process.env },
-    shell: false,
+    shell: false
   });
 
-  flServerProcess.stdout.on("data", (data) => {
-    event.sender.send("server-log", data.toString());
+  flServerProcess.stdout.on('data', (data) => {
+    event.sender.send('server-log', data.toString());
   });
   flServerProcess.stderr.on("data", (data) => {
     event.sender.send("server-log", data.toString());
@@ -275,17 +264,17 @@ ipcMain.on("start-fl-client", (event, { clientId, videoPath }) => {
     return;
   }
 
-  const aresPath = path.join(__dirname, "..");
+  const aresPath = path.join(__dirname, '..');
 
-  const proc = spawn(
-    VENV_PYTHON,
-    ["client/fl_client.py", String(clientId), videoPath],
-    {
-      cwd: aresPath,
-      env: { ...process.env },
-      shell: false,
-    },
-  );
+  const proc = spawn(VENV_PYTHON, [
+    'client/fl_client.py',
+    String(clientId),
+    videoPath
+  ], {
+    cwd: aresPath,
+    env: { ...process.env },
+    shell: false
+  });
 
   clientProcesses[clientId] = proc;
   event.sender.send("client-log", {
